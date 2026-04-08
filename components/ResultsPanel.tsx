@@ -1,22 +1,20 @@
 'use client'
 import clsx from 'clsx'
-import { RES_EXPORT_LONG_EDGE } from '@/lib/constants'
 import type { HistoryItem } from '@/lib/types'
 
 interface Props {
   history: HistoryItem[]
   currentIdx: number
   onSelectHistory: (idx: number) => void
+  onDeleteItem: (id: number) => void
   onClearHistory: () => void
 }
 
-export default function ResultsPanel({ history, currentIdx, onSelectHistory, onClearHistory }: Props) {
+export default function ResultsPanel({ history, currentIdx, onSelectHistory, onDeleteItem, onClearHistory }: Props) {
   const current = history[currentIdx] ?? null
 
-  // 下载逻辑：
-  // 1. Canvas 重绘 → JPEG blob，修复 macOS QuickLook 缩略图问题
-  // 2. 按生成时选定的分辨率缩放长边（2K=2560px / 4K=3840px），原始则不缩放
-  // 注：Gemini 模型输出尺寸固定（约 1376×768），2K/4K 是导出阶段的 Canvas 缩放
+  // 下载逻辑：Canvas 重绘 → JPEG blob，修复 macOS QuickLook 缩略图问题
+  // 分辨率已由 API imageConfig.imageSize 控制，此处保持原始尺寸直接导出
   async function download() {
     if (!current) return
 
@@ -24,25 +22,11 @@ export default function ResultsPanel({ history, currentIdx, onSelectHistory, onC
     img.src = current.dataUrl
     await new Promise<void>(resolve => { img.onload = () => resolve() })
 
-    const nativeW   = img.naturalWidth
-    const nativeH   = img.naturalHeight
-    const targetEdge = RES_EXPORT_LONG_EDGE[current.resolution ?? 'standard']
-
-    let exportW = nativeW
-    let exportH = nativeH
-    if (targetEdge > 0) {
-      const scale = targetEdge / Math.max(nativeW, nativeH)
-      exportW = Math.round(nativeW * scale)
-      exportH = Math.round(nativeH * scale)
-    }
-
     const canvas = document.createElement('canvas')
-    canvas.width  = exportW
-    canvas.height = exportH
+    canvas.width  = img.naturalWidth
+    canvas.height = img.naturalHeight
     const ctx = canvas.getContext('2d')!
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, 0, 0, exportW, exportH)
+    ctx.drawImage(img, 0, 0)
 
     canvas.toBlob(blob => {
       if (!blob) return
@@ -137,20 +121,29 @@ export default function ResultsPanel({ history, currentIdx, onSelectHistory, onC
           </p>
           <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
             {history.map((item, idx) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={item.id}
-                src={item.dataUrl}
-                alt={item.cardNum}
-                title={`${item.cardNum} · ${item.timestamp}`}
-                onClick={() => onSelectHistory(idx)}
-                className={clsx(
-                  'w-14 h-[72px] object-cover rounded-md cursor-pointer border-2 transition-all',
-                  idx === currentIdx
-                    ? 'border-accent opacity-100'
-                    : 'border-transparent opacity-60 hover:opacity-90 hover:border-accent-light',
-                )}
-              />
+              <div key={item.id} className="relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.dataUrl}
+                  alt={item.cardNum}
+                  title={`${item.cardNum} · ${item.timestamp}`}
+                  onClick={() => onSelectHistory(idx)}
+                  className={clsx(
+                    'w-14 h-[72px] object-cover rounded-md cursor-pointer border-2 transition-all',
+                    idx === currentIdx
+                      ? 'border-accent opacity-100'
+                      : 'border-transparent opacity-60 hover:opacity-90 hover:border-accent-light',
+                  )}
+                />
+                {/* hover 删除按钮 */}
+                <button
+                  onClick={e => { e.stopPropagation(); onDeleteItem(item.id) }}
+                  title="删除"
+                  className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full bg-red-600 text-white text-[9px] opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <i className="ri-close-line" />
+                </button>
+              </div>
             ))}
           </div>
         </div>

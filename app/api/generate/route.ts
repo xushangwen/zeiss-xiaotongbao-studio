@@ -15,7 +15,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { prompt, aspectRatio } = body as { prompt: string; aspectRatio?: string }
+  const { prompt, aspectRatio, resolution } = body as {
+    prompt: string
+    aspectRatio?: string
+    resolution?: 'standard' | '2k' | '4k'
+  }
 
   if (!prompt?.trim()) {
     return NextResponse.json({ error: '提示词不能为空' }, { status: 400 })
@@ -23,13 +27,23 @@ export async function POST(req: NextRequest) {
 
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`
 
-  // 宽高比通过提示词引导，不通过 API 参数（gemini-flash 不支持 imageGenerationConfig）
-  void aspectRatio
+  // 映射前端 resolution → Gemini imageSize（必须大写 K；'512' 无后缀）
+  const IMAGE_SIZE: Record<'standard' | '2k' | '4k', string> = {
+    standard: '1K',
+    '2k':     '2K',
+    '4k':     '4K',
+  }
+  const imageSize = IMAGE_SIZE[resolution ?? 'standard']
 
   const requestBody = {
     contents: [{ parts: [{ text: prompt }], role: 'user' }],
     generationConfig: {
       responseModalities: ['IMAGE'],
+      // imageConfig 控制分辨率和宽高比
+      imageConfig: {
+        imageSize,
+        ...(aspectRatio ? { aspectRatio } : {}),
+      },
     },
   }
 

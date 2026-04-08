@@ -10,6 +10,7 @@ import ToastList from './ToastList'
 import { useToast } from '@/hooks/useToast'
 import { CARDS } from '@/lib/cards'
 import { DEFAULT_STYLE_DNA, RATIO_HINTS } from '@/lib/constants'
+import { dbSave, dbLoadAll, dbDelete, dbClear } from '@/lib/db'
 import type { AspectRatio, Resolution, HistoryItem } from '@/lib/types'
 
 const LS_DNA    = 'zeiss_style_dna'
@@ -30,12 +31,20 @@ export default function Studio() {
   const [currentIdx,     setCurrentIdx]     = useState(-1)
   const [error,          setError]          = useState<string | null>(null)
 
-  // ── LocalStorage 初始化 ───────────────────────
+  // ── 初始化：LocalStorage + IndexedDB 历史 ────
   useEffect(() => {
     const savedDNA    = localStorage.getItem(LS_DNA)
     const savedLocked = localStorage.getItem(LS_LOCKED) === 'true'
     if (savedDNA)    setStyleDNA(savedDNA)
     if (savedLocked) setIsStyleLocked(true)
+
+    // 从 IndexedDB 恢复历史记录
+    dbLoadAll().then(items => {
+      if (items.length > 0) {
+        setHistory(items)
+        setCurrentIdx(0)
+      }
+    }).catch(() => { /* IndexedDB 不可用时静默降级 */ })
   }, [])
 
   // ── 持久化 ───────────────────────────────────
@@ -131,6 +140,7 @@ export default function Studio() {
         body: JSON.stringify({
           prompt: buildFullPrompt(),
           aspectRatio,
+          resolution,
         }),
       })
 
@@ -145,8 +155,11 @@ export default function Studio() {
         dataUrl: data.dataUrl,
         cardNum: selectedCardId !== null ? `No.${selectedCardId}` : '自定义',
         timestamp: new Date().toLocaleTimeString('zh-CN'),
-        resolution,  // 记录导出分辨率，下载时据此缩放
+        resolution,
       }
+
+      // 持久化到 IndexedDB
+      dbSave(item).catch(() => { /* 存储失败时不中断主流程 */ })
 
       setHistory(prev => [item, ...prev])
       setCurrentIdx(0)
@@ -165,7 +178,7 @@ export default function Studio() {
   return (
     <div
       className="grid h-screen overflow-hidden bg-bg text-tx font-sans"
-      style={{ gridTemplateColumns: '268px 1fr 400px', gridTemplateRows: '48px 1fr' }}
+      style={{ gridTemplateColumns: '268px 340px 1fr', gridTemplateRows: '48px 1fr' }}
     >
       {/* 顶部栏：横跨3列 */}
       <Topbar />
@@ -208,9 +221,25 @@ export default function Studio() {
         history={history}
         currentIdx={currentIdx}
         onSelectHistory={setCurrentIdx}
+        onDeleteItem={(id) => {
+          setHistory(prev => {
+            const deletedIdx = prev.findIndex(item => item.id === id)
+            const next = prev.filter(item => item.id !== id)
+            if (next.length === 0) {
+              setCurrentIdx(-1)
+            } else if (deletedIdx === currentIdx) {
+              setCurrentIdx(Math.min(currentIdx, next.length - 1))
+            } else if (deletedIdx < currentIdx) {
+              setCurrentIdx(currentIdx - 1)
+            }
+            return next
+          })
+          dbDelete(id).catch(() => {})
+        }}
         onClearHistory={() => {
           setHistory([])
           setCurrentIdx(-1)
+          dbClear().catch(() => {})
           addToast('历史记录已清空')
         }}
       />

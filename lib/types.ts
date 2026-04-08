@@ -11,7 +11,7 @@ export interface HistoryItem {
   dataUrl: string
   cardNum: string
   timestamp: string
-  resolution: Resolution  // 存储生成时选中的导出分辨率
+  resolution: Resolution  // 生成时请求的分辨率（standard/2k/4k）
 }
 
 export type AspectRatio = '9:16' | '1:1' | '16:9' | '4:3'
