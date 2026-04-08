@@ -190,6 +190,7 @@ export default function Studio() {
         cardNum: selectedCardId !== null ? `No.${selectedCardId}` : '自定义',
         timestamp: new Date().toLocaleTimeString('zh-CN'),
         resolution,
+        fullPrompt: buildFullPrompt(),
       }
 
       // 持久化到 IndexedDB
@@ -258,6 +259,16 @@ export default function Studio() {
         history={history}
         currentIdx={currentIdx}
         onSelectHistory={setCurrentIdx}
+        onRestorePrompt={(fullPrompt) => {
+          // 只回填场景部分，[Style] 和 [Composition] 由系统自动附加
+          const sceneOnly = fullPrompt
+            .replace(/\.\s*\[Style\]:[\s\S]*?(?=\.\s*\[|$)/, '')
+            .replace(/\.\s*\[Composition\]:[\s\S]*?(?:\.|$)/, '')
+            .replace(/\.$/, '')
+            .trim()
+          setScenePrompt(sceneOnly)
+          addToast('提示词已回填到编辑区', 'info')
+        }}
         onDeleteItem={(id) => {
           setHistory(prev => {
             const deletedIdx = prev.findIndex(item => item.id === id)

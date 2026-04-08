@@ -12,6 +12,7 @@ export interface HistoryItem {
   cardNum: string
   timestamp: string
   resolution: Resolution  // 生成时请求的分辨率（standard/2k/4k）
+  fullPrompt?: string     // 发送给模型的完整提示词（含场景+风格DNA+构图）
 }
 
 export type AspectRatio = '9:16' | '1:1' | '16:9' | '4:3'
