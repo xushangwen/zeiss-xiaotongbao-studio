@@ -8,20 +8,24 @@ interface Props {
   scenePrompt: string
   fullPrompt: string
   isGenerating: boolean
+  isRefining: boolean
   error: string | null
+  refineError: string | null
   onSceneChange: (v: string) => void
   onGenerate: () => void
   onClear: () => void
   onEnhance: () => void
   onCopyPrompt: () => void
+  onRefine: (feedback: string) => void
 }
 
 export default function PromptWorkspace({
   styleDNA, isStyleLocked, scenePrompt, fullPrompt,
-  isGenerating, error,
-  onSceneChange, onGenerate, onClear, onEnhance, onCopyPrompt,
+  isGenerating, isRefining, error, refineError,
+  onSceneChange, onGenerate, onClear, onEnhance, onCopyPrompt, onRefine,
 }: Props) {
-  const [showFull, setShowFull] = useState(false)
+  const [showFull, setShowFull]       = useState(false)
+  const [feedback, setFeedback]       = useState('')
 
   return (
     <div className="flex flex-col overflow-hidden bg-bg">
@@ -87,6 +91,55 @@ export default function PromptWorkspace({
             {error}
           </div>
         )}
+
+        {/* AI 提示词优化 */}
+        <div className="space-y-2 rounded-[10px] border border-border bg-s2 p-3">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase text-accent-light">
+            <i className="ri-brain-line" />
+            AI 深度优化提示词
+          </div>
+          <p className="text-[11px] text-tx-dim leading-relaxed">
+            描述你对上次生成结果的不满之处，AI 将深度分析后重整提示词
+          </p>
+          <textarea
+            value={feedback}
+            onChange={e => setFeedback(e.target.value)}
+            rows={3}
+            disabled={isRefining}
+            className="w-full resize-none rounded-md border border-border bg-surface text-tx text-[12px] leading-[1.7] p-2.5 outline-none focus:border-accent-light transition-colors placeholder:text-tx-dim disabled:opacity-50"
+            placeholder={`例：\n· 去掉眼镜，孩子改成侧面站姿\n· 背景太空旷，加一些书架元素`}
+          />
+          {refineError && (
+            <p className="text-[11px] text-red-400 flex items-center gap-1">
+              <i className="ri-alert-line" />{refineError}
+            </p>
+          )}
+          <button
+            onClick={() => { onRefine(feedback); setFeedback('') }}
+            disabled={isRefining || !feedback.trim()}
+            className={clsx(
+              'w-full flex items-center justify-center gap-2 py-2 rounded-md text-[13px] font-semibold transition-all',
+              isRefining || !feedback.trim()
+                ? 'bg-s3 text-tx-dim cursor-not-allowed'
+                : 'bg-accent/15 border border-accent/40 text-accent-light hover:bg-accent/25 hover:border-accent-light',
+            )}
+          >
+            {isRefining ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin-slow" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
+                </svg>
+                深度思考中...
+              </>
+            ) : (
+              <>
+                <i className="ri-sparkling-line" />
+                AI 重整提示词
+              </>
+            )}
+          </button>
+        </div>
 
         {/* 完整提示词预览（可展开） */}
         <div className="space-y-1.5">

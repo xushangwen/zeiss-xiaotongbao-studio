@@ -27,9 +27,11 @@ export default function Studio() {
   const [aspectRatio,    setAspectRatio]    = useState<AspectRatio>('16:9')
   const [resolution,     setResolution]     = useState<Resolution>('standard')
   const [isGenerating,   setIsGenerating]   = useState(false)
+  const [isRefining,     setIsRefining]     = useState(false)
   const [history,        setHistory]        = useState<HistoryItem[]>([])
   const [currentIdx,     setCurrentIdx]     = useState(-1)
   const [error,          setError]          = useState<string | null>(null)
+  const [refineError,    setRefineError]    = useState<string | null>(null)
 
   // ── 初始化：LocalStorage + IndexedDB 历史 ────
   useEffect(() => {
@@ -127,6 +129,38 @@ export default function Studio() {
     })
   }
 
+  // ── AI 深度优化提示词 ─────────────────────────
+  async function handleRefine(feedback: string) {
+    if (!feedback.trim()) return
+    setIsRefining(true)
+    setRefineError(null)
+
+    try {
+      const res = await fetch('/api/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenePrompt,
+          styleDNA,
+          userFeedback: feedback,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || `服务器错误 ${res.status}`)
+
+      setScenePrompt(data.refinedPrompt)
+      addToast('提示词已优化 ✦', 'success')
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '优化失败'
+      setRefineError(msg)
+      addToast('提示词优化失败', 'error')
+    } finally {
+      setIsRefining(false)
+    }
+  }
+
   // ── 核心：生成图片 ────────────────────────────
   async function handleGenerate() {
     if (!scenePrompt.trim()) { addToast('请先输入场景描述', 'error'); return }
@@ -208,12 +242,15 @@ export default function Studio() {
         scenePrompt={scenePrompt}
         fullPrompt={buildFullPrompt()}
         isGenerating={isGenerating}
+        isRefining={isRefining}
         error={error}
+        refineError={refineError}
         onSceneChange={setScenePrompt}
         onGenerate={handleGenerate}
         onClear={handleClear}
         onEnhance={handleEnhance}
         onCopyPrompt={handleCopyPrompt}
+        onRefine={handleRefine}
       />
 
       {/* 右侧：结果区 */}
